@@ -1,0 +1,176 @@
+---
+title: "Car Features and MSRP"
+author: "Yiqing Zhang, Zongqi Lyu"
+date: "2022/4/29"
+output:
+  html_document:
+    fig_width: 8
+    code_folding: hide
+    highlight: tango
+    toc: true
+    toc_float:
+      collapsed: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.width=8, fig.height=4,
+                      echo=FALSE, warning=FALSE, message=FALSE)
+```
+
+# Data Set Overview
+The data that we have is from Kaggle and it shows the car features for each model of car from 1990 to 2017, which includes most of the car brands in the market such as “Audi”, “BMW”, “Tesla”, "Toyota", “Nissan” etc. Also includes most of the models for each brand. The year column indicates the year that the model was produced. Engine fuel type is categorical data indicating the type of fuel the engine is required, the levels include "diesel", "electric", "premium unleaded (required)", "regular unleaded" and so on, a total of 11 types of fuels. Engine horsepower indicates how powerful the car engine is, which is an important element in our next analysis. The engine cylinder shows the number of cylinders the engine has. Transmission type, driven wheels and number of doors are pretty straightforward. The market category shows how the automobile market defines the specific model, which can include tags such as “High-Performance”, “Luxury”, “Hybrid” etc. can also mix and match any number of tags. Vehicle size is measured by the total volume of the car, it has three levels "Compact", "Large" and “Midsize”. Vehicle style shows whether the car is a regular sedan, coupe, cargo van or wagon, it has a total of 16 levels. Highway MPG and city MPG are measurements to show how fuel efficiency that car is. The popularity index shows how well the car was sold. Finally, the MSRP indicates the manufacturer's suggested retail price of the car. As we can see, the dataset has a total of 11914 rows and 16 columns, which is sufficient for our later analysis.
+```{r echo=TRUE}
+data <- read.csv("datafile.csv", header = T)
+# Remove empty rows and duplicate rows
+car <- data[complete.cases(data), ]
+car <- car[!duplicated(car), ]
+# Remove outliers
+Q1 <- quantile(car$MSRP, .25)
+Q3 <- quantile(car$MSRP, .75)
+IQR <- IQR(car$MSRP)
+car <- subset(car, car$MSRP > (Q1 - 1.5*IQR) & car$MSRP < (Q3 + 1.5*IQR))
+# Remove unused columns and keep only the following columns
+columns <- c("Make",
+             "Year",
+             "Engine.HP", 
+             "Engine.Cylinders", 
+             "highway.MPG",
+             "city.mpg",
+             "Popularity",
+             "MSRP")
+car <- car[, columns]
+attach(car)
+head(car)
+```
+
+# Goal of Analysis
+The price of a car is the key that most people care about. So, the goal of this project is to analyze the relationships between each feature of the car and the manufacturer's suggested retail price of the car. Which feature is highly correlated with the price and which one is not. With the correlation, we can even predict the price of a car with some key features. Since there is some feature that is not needed, such as the model which is an unknown factor of the car, each make can have a large variance between all the models. So, the features that we care about are "Make", "Year", "Engine horsepower", "Engine cylinders", “highway.MPG", "city.mpg" and "Popularity". We are going to find out which of these features can have the highest impact on the price of the car.
+
+
+# MSRP Distribution
+For the MSRP distribution we have here, it is clear that the highest appearance of the price range is between 2000 – 2999, 1137 cars are filling in this range. Besides that part, the rest of the data appears in a relatively normal shape, with a right tail, that is because there are some luxury and performance cars have a high retail price, and the price range for most of the daily used cars is between 20,600 and 39,000 with a mean of 29,500 and a median of 29,000. The minimum car retail price is 2,000 dollars, and the maximum is 75,200. This is because we removed the outliers, with the outlier the maximum price could exceed 2 million. This makes sense, as we expected most of the cars in the market today are between 20,000 to 40,000 US dollars and some luxury or performance cars have an extremely high price even above a million. And the minimum price we obtained is economy cars with production year before 2000. 
+```{r echo=TRUE}
+library(plotly)
+plot_ly(car, x = ~MSRP, type="histogram", name = 'MSRP')
+```
+
+# Central Limit Theorem
+The central limit theorem in probability theory states that the distribution of a variable relative to its size increases as its sample size increases. This is done so assuming that all samples are the same size. CLT states that if large sample size is obtained, the mean of all the variables from that population will be roughly equal to that of the whole population, it also states that even though the distribution of the data is abnormal, the mean of the data is still within the mean of the population. In other words, if the sample size gets larger, the variance of the variables will also be equal to that of the population. In our case, we chose to use 4 different sample sizes, 10, 20, 30 and 40 which are randomly picked in the dataset. In our case, the population mean is 29,466.32 and the standard deviation is 15909.84. As we can see in the graph, the mean of each sample size is close to the population mean but as the sample size goes up, the standard deviation is getting smaller and smaller, and the distribution is getting even more narrow. This matches the central limit theorem, as the sample size gets larger, the shape of the sampling distribution becomes relatively normal. 
+```{r echo=TRUE}
+means1 = rep(NA, 5000)
+set.seed(544)
+for(i in 1:5000){
+  means1[i] = mean(sample(car$MSRP, size = 10))
+}
+
+means2 = rep(NA, 5000)
+set.seed(544)
+for(i in 1:5000){
+  means2[i] = mean(sample(car$MSRP, size = 20))
+}
+
+means3 = rep(NA, 5000)
+set.seed(544)
+for(i in 1:5000){
+  means3[i] = mean(sample(car$MSRP, size = 30))
+}
+
+means4 = rep(NA, 5000)
+set.seed(544)
+for(i in 1:5000){
+  means4[i] = mean(sample(car$MSRP, size = 40))
+}
+cat(paste0("MSRP mean = ",round(mean(car$MSRP),2), ", SD = ", round(sd(car$MSRP),2),"\n"),
+paste0("Sample size = 10, mean = ",round(mean(means1),2), ", SD = ", round(sd(means1),2),"\n"),
+paste0("Sample size = 20, mean = ",round(mean(means2),2), ", SD = ", round(sd(means2),2),"\n"),
+paste0("Sample size = 30, mean = ",round(mean(means3),2), ", SD = ", round(sd(means3),2),"\n"),
+paste0("Sample size = 40, mean = ",round(mean(means4),2), ", SD = ", round(sd(means4),2)),sep = "")
+```
+```{r echo=TRUE}
+subplot(plot_ly(x = means1, type="histogram", name = 'Sample size = 10'),
+plot_ly(x = means2, type="histogram", name = 'Sample size = 20'),
+plot_ly(x = means3, type="histogram", name = 'Sample size = 30'),
+plot_ly(x = means4, type="histogram", name = 'Sample size = 40'),nrows = 2)
+
+```
+
+# General Analysis of MSRP
+
+## MSRP for different Make
+The following table is a summary of MSRP based on different car makes. The highest average MSRP make is the well-known luxury brand, Maserati. The average retail price of Maserati is 71,000 dollars. We can see that it also has the highest minimum price, which means the variance of Maserati is small, this indicates that for most Maserati models, the price range is between 70,000 and 72,000 dollars. While Cadillac tells us a different story, as we can see in the table, although Cadillac has the fourth-highest average retail price, it has a relatively large variance as the minimum price for Cadillac is only 2000 dollars, and the highest Cadillac model has a retail price of 58,000 dollars. This can be caused by 2 reasons, first reason could be the dataset of Cadillac contains some extremely old models, produced before the year 2000. This makes sense as we mentioned earlier, the car price has a huge gap before and after the year 2000. Another reason is that there is a huge gap in retail prices between models in Cadillac. So, we did some inspection of the Cadillac to find out the year of the model whose retail price is below 1.5 IQR of the first quantile. The result shows our first guess is correct, that all the models that have a low retail price are produced before the year 2000, which means that all models made after the year 2000 have a relatively reasonable variance. When we look at the boxplot for the make vs. MSRP, we found that Mercedes, Porsche, SAAB and Volvo, these brands have a ridiculous interquartile range, which means the middle 50% of data points of these brands are widely spread, so that the price of each model have relatively big differences. 
+```{r echo=TRUE, message=FALSE, paged.print=FALSE}
+library(dplyr)
+a <- aggregate(MSRP~Make, data = car, summary)
+a %>% arrange(desc(MSRP[,"Mean"]))
+```
+```{r echo=TRUE}
+cadi <- car[which(Make == "Cadillac"), ]
+Q1.cadi <- quantile(cadi$MSRP, .25)
+Q3.cadi <- quantile(cadi$MSRP, .75)
+IQR.cadi <- IQR(cadi$MSRP)
+cadi[which(cadi$MSRP < (Q1.cadi - 1.5*IQR.cadi)), "Year"]
+```
+```{r echo=TRUE}
+plot_ly(car, x = ~Make, y = ~MSRP, type="box", name = 'MSRP')
+```
+
+
+## MSRP for different engine cylinders
+Below is the summary table for different numbers of the engine cylinder. As we can see in the table, despite the 0- and 12-cylinder cars, the rest of the cars follow the rule the higher the number of engine cylinders is the higher the retail price. 0 cylinder indicates that the car is electric, which also makes sense since generally speaking, electric cars are more expensive than gas cars. But the weird thing here is the 12-cylinder cars, is has the lowest average retail price. Our guess is for those 12-cylinder cars, the production year is before 2000. And the second table proved our hypothesis, we can see that all 12-cylinder cars are produced before the year 2000. 
+```{r echo=TRUE, paged.print=FALSE}
+aggregate(MSRP~Engine.Cylinders, data = car, summary)
+```
+```{r echo=TRUE}
+car[which(car$Engine.Cylinders == 12), ]
+```
+```{r echo=TRUE}
+plot_ly(car, x = ~Engine.Cylinders, y = ~MSRP, type="box", name = 'MSRP')
+```
+
+## Mean of MSRP for different years
+As we mentioned earlier, we noticed that the price before and after the year 2000 has a huge gap. Therefore, to prove this hypothesis, we made a visualization to show the trend of the price. And below is the line graph of the year versus MSRP. As we expected, there is a huge gap before and after the year 2000.
+```{r echo=TRUE}
+year_of_MSRP_mean<-aggregate(MSRP~Year, data = car, FUN = mean)
+plot_ly(year_of_MSRP_mean,x = ~Year, y = ~MSRP, type = "scatter", mode = "lines+markers", name = "Mean of MSRP for different years")
+```
+
+
+# Sampling
+There is a total of 5 sampling methods. Like putting everyone's name into a hat, random sampling is similar to drawing out several names. However, it is usually much harder to do since it requires a complete list of all the elements in the population. Unlike random sampling, systematic sampling is usually easier to do since it eliminates the list of all the elements. This method, which is similar to lining everyone up, eliminates the list of all the elements and uses all the numbers in the population. Although convenience sampling is generally easier to do, it is probably the worst technique for gathering data. In convenience sampling, the data is obtained by running into the first people that the survey encounters. The goal of cluster sampling is to divide the population into groups, which are usually geographically dispersed. Each element in the group is randomly selected. Another type of sampling that involves separating the population into groups is stratified sampling. For instance, if the population is composed of males and females, then a sample is taken from each stratum. The goal of sampling is to find a method that is likely to yield a representative sample of the population. As we can see in the below graph, the four sampling methods we used can clearly represent the population distribution, they are extremely similar in shape. 
+```{r echo=TRUE}
+library(sampling)
+set.seed(544)
+sample1 = car[sample(1:nrow(car), size = 500), ]
+
+N <- nrow(car)
+n <- 500
+k <- ceiling(N/n)
+set.seed(544)
+r = sample(k, 1)
+sample2 <- car[seq(r, by = k, length = n),]
+
+pik <- inclusionprobabilities(car$Popularity,500)
+sample3 <- car[UPsystematic(pik) != 0,]
+
+car1 <- car[order(car$Year),]
+freq <- table(car1$Year)
+st.sizes <- 500 * freq / sum(freq)
+st.sizes <- as.vector(t(st.sizes))
+st.sizes <- st.sizes[st.sizes!=0]
+st.4 <- strata(car1, stratanames = "Year", size = st.sizes, method = "srswor")
+sample4 <- getdata(car1, st.4)
+
+subplot(plot_ly(x = car$MSRP, type="histogram", name = "Frequency of MSRP"),
+plot_ly(x = sample1$MSRP, type="histogram", name = "Simple random sampling without replacement"),
+plot_ly(x = sample2$MSRP, type="histogram", name = "Systematic sampling"),
+plot_ly(x = sample3$MSRP, type="histogram", name = "Systematic sampling with unequal probabilities(Popularity)"),
+plot_ly(x = sample4$MSRP, type="histogram", name = "Stratified sampling(Year)"),nrows = 3)
+```
+
+# Conclusion
+As the linear model shows, the relationship between each feature and retail price is clear. As the year, engine horsepower and fuel efficiency go up, the price goes up. As engine cylinders and popularity go up the price goes down. The engine cylinders and popularity might cause some misunderstanding, engine cylinders have an inverse relationship to MSRP is because of the existence of the 12-cylinder engine as we mentioned earlier, the popularity has an inverse relationship is because the cheaper car is much more popular than those luxury cars. And there are 73% of the data can be presented by this model.
+```{r echo=TRUE}
+m <- lm(MSRP ~ Year + Engine.Cylinders + Engine.HP + Popularity + city.mpg)
+summary(m)
+```
+
